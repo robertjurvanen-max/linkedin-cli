@@ -58,9 +58,14 @@ LINKEDIN_SCOPES=r_basicprofile,w_member_social,r_organization_social,w_organizat
 node dist/index.js auth login
 ```
 
-A browser window opens. Sign in to LinkedIn and click **Allow**.
+This will:
+1. ✅ Open your browser automatically
+2. ✅ Start a local server to catch the callback
+3. ✅ Exchange the code for a token
 
-Done! You're authenticated.
+Just sign in to LinkedIn, click **Allow**, and you're done!
+
+> **Troubleshooting:** If the browser doesn't open, copy the URL from the terminal and paste it manually. The callback will still be caught automatically.
 
 ---
 
@@ -128,6 +133,17 @@ node dist/index.js orgs post 34623057 \
 
 ## Troubleshooting
 
+### Login doesn't complete / Browser callback fails
+
+If the automatic callback doesn't work:
+
+```bash
+# Use manual mode instead
+node dist/index.js auth login --manual
+```
+
+This will show a URL. Open it, authorize, and when you get redirected to a "can't reach" page, copy the `code=XXXXX` from the URL bar and paste it.
+
 ### "Not enough permissions"
 
 Your token doesn't have the right scopes. Fix:
@@ -144,6 +160,10 @@ Your token doesn't have the right scopes. Fix:
 
 That scope isn't enabled for your LinkedIn app. Go to your app's **Products** tab and request the relevant product.
 
+Common products you need:
+- **Share on LinkedIn** → posting to personal profile
+- **Advertising API** → posting to company pages
+
 ### "File not found"
 
 Check the image path. Use absolute paths to be safe:
@@ -156,6 +176,13 @@ Check the image path. Use absolute paths to be safe:
 Tokens last ~60 days. Just login again:
 ```bash
 node dist/index.js auth login
+```
+
+### Port already in use
+
+Another app is using port 4002. Use a different port:
+```bash
+node dist/index.js auth login --port 4003
 ```
 
 ---

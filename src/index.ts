@@ -409,16 +409,28 @@ orgCmd
   .command('post <orgId>')
   .description('Create a post on behalf of an organization')
   .requiredOption('-t, --text <text>', 'Post text content')
+  .option('-i, --image <path>', 'Image file path or URL to attach')
   .option('-v, --visibility <visibility>', 'Post visibility (PUBLIC/CONNECTIONS)', 'PUBLIC')
   .action(async (orgId, options) => {
     try {
       const client = createClient();
       
       console.log('Creating organization post...');
-      const result = await client.createOrganizationPost(orgId, {
-        text: options.text,
-        visibility: options.visibility
-      });
+      
+      let result;
+      if (options.image) {
+        console.log('Uploading image...');
+        result = await client.createOrganizationImagePost(orgId, {
+          text: options.text,
+          visibility: options.visibility,
+          imageUrl: options.image
+        });
+      } else {
+        result = await client.createOrganizationPost(orgId, {
+          text: options.text,
+          visibility: options.visibility
+        });
+      }
       
       console.log(formatSuccess('Organization post created successfully!'));
       console.log(JSON.stringify(result, null, 2));

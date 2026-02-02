@@ -1,261 +1,205 @@
 # LinkedIn CLI
 
-A comprehensive command-line interface for interacting with the LinkedIn API with OAuth 2.0 authentication.
+Post to LinkedIn from your terminal. Simple as that.
 
-## Features
+## Quick Start (5 minutes)
 
-- **OAuth 2.0 Authentication** - Secure login with automatic token management
-- **Profile Access** - View your LinkedIn profile information
-- **Post Management** - Create, list, and delete posts
-- **Image Posts** - Upload and share images
-- **Article Sharing** - Share articles with custom titles and descriptions
-- **Organization Pages** - Post on behalf of company pages you administer
-- **Visibility Control** - Choose PUBLIC or CONNECTIONS-only visibility
-
-## Installation
+### 1. Install
 
 ```bash
+git clone https://github.com/robertjurvanen-max/linkedin-cli.git
 cd linkedin-cli
 npm install
 npm run build
 ```
 
-## Quick Start
+### 2. Create a LinkedIn App
 
-### Option A: Direct Token (For your own account)
+1. Go to **[LinkedIn Developers](https://www.linkedin.com/developers/apps)**
+2. Click **Create app**
+3. Fill in:
+   - App name: anything (e.g., "My LinkedIn CLI")
+   - LinkedIn Page: select your company page
+   - App logo: any image
+4. Click **Create app**
 
-If you just need to post from your own account, you can generate a token directly:
+### 3. Get Your Credentials
 
-1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps)
-2. Create or open your app
-3. Go to the "Auth" tab
-4. Generate an access token with the required scopes
+1. In your app, go to the **Auth** tab
+2. Copy the **Client ID** and **Client Secret**
+3. Under "OAuth 2.0 settings", add this redirect URL:
+   ```
+   http://localhost:4002/callback
+   ```
 
-Save the token:
+### 4. Request API Access
 
-```bash
-mkdir -p ~/.clawdbot/credentials
+Still in your LinkedIn app:
 
-cat > ~/.clawdbot/credentials/linkedin.json << 'EOF'
-{
-  "access_token": "YOUR_ACCESS_TOKEN",
-  "expires_in": 5184000,
-  "scope": "openid profile email w_member_social",
-  "token_type": "Bearer",
-  "created_at": "2024-01-01T00:00:00.000Z"
-}
-EOF
-```
+1. Go to the **Products** tab
+2. Request access to:
+   - **Share on LinkedIn** (for posting)
+   - **Advertising API** (for company page access)
+3. Wait for approval (usually instant for Share, may take a day for Advertising)
 
-Test it:
-```bash
-linkedin profile
-```
+### 5. Configure the CLI
 
-### Option B: OAuth Flow (For multi-user apps)
-
-For apps where users connect their own accounts:
-
-#### 1. Create a LinkedIn App
-
-1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps)
-2. Click "Create app"
-3. Fill in app details
-
-#### 2. Configure OAuth
-
-1. Go to your app's "Auth" tab
-2. Add redirect URL: `https://your-domain.com/callback` (must be HTTPS)
-3. Request these products:
-   - **Sign In with LinkedIn using OpenID Connect**
-   - **Share on LinkedIn**
-
-#### 3. Set Credentials
+Create a `.env` file in the linkedin-cli folder:
 
 ```bash
-export LINKEDIN_CLIENT_ID="your_client_id"
-export LINKEDIN_CLIENT_SECRET="your_client_secret"
+LINKEDIN_CLIENT_ID=your_client_id_here
+LINKEDIN_CLIENT_SECRET=your_client_secret_here
+LINKEDIN_SCOPES=r_basicprofile,w_member_social,r_organization_social,w_organization_social,rw_organization_admin
 ```
 
-Or create `.env`:
-```
-LINKEDIN_CLIENT_ID=your_client_id
-LINKEDIN_CLIENT_SECRET=your_client_secret
-```
-
-#### 4. Login
+### 6. Login
 
 ```bash
-linkedin auth login
+node dist/index.js auth login
 ```
 
-> **Note**: LinkedIn OAuth requires HTTPS redirect URIs. Use [ngrok](https://ngrok.com) for local development.
+A browser window opens. Sign in to LinkedIn and click **Allow**.
 
-## Commands
+Done! You're authenticated.
 
-### Authentication
+---
+
+## Usage
+
+### Check Which Company Pages You Can Post To
 
 ```bash
-# Show setup instructions
-linkedin auth setup
-
-# Login with OAuth
-linkedin auth login
-
-# Login in manual mode (for remote/headless setups)
-linkedin auth login --manual
-
-# Check authentication status
-linkedin auth status
-
-# Refresh token
-linkedin auth refresh
-
-# Logout
-linkedin auth logout
+node dist/index.js orgs list --format json
 ```
 
-### Profile
+This shows all LinkedIn pages you admin. Note the `id` number for posting.
+
+### Post to a Company Page
+
+**Text only:**
+```bash
+node dist/index.js orgs post YOUR_ORG_ID -t "Hello LinkedIn! 🚀"
+```
+
+**With an image:**
+```bash
+node dist/index.js orgs post YOUR_ORG_ID -t "Check out our office!" -i /path/to/photo.jpg
+```
+
+**With an image from URL:**
+```bash
+node dist/index.js orgs post YOUR_ORG_ID -t "Cool pic" -i "https://example.com/image.jpg"
+```
+
+### Post to Your Personal Profile
 
 ```bash
-# Get your profile
-linkedin profile
-
-# Get profile as JSON
-linkedin profile --format json
+node dist/index.js posts create -t "Hello from the CLI!"
 ```
 
-### Posts
+### Check Auth Status
 
 ```bash
-# List your recent posts
-linkedin posts list
-linkedin posts list --limit 25
-linkedin posts list --format json
-
-# Create a text post
-linkedin posts create -t "Hello LinkedIn!"
-
-# Create a post with image
-linkedin posts create -t "Check out this photo!" -i "https://example.com/image.jpg"
-
-# Create a connections-only post
-linkedin posts create -t "For my network only" -v CONNECTIONS
-
-# Share an article
-linkedin posts create -t "Great read!" \
-  --article-url "https://example.com/article" \
-  --article-title "Interesting Article" \
-  --article-description "A must-read for everyone"
-
-# Delete a post
-linkedin posts delete <postId>
+node dist/index.js auth status
 ```
 
-### Organizations
+### Logout
 
 ```bash
-# List organizations you administer
-linkedin organizations list
-linkedin orgs list
-
-# Post on behalf of an organization
-linkedin orgs post <orgId> -t "Company announcement!"
+node dist/index.js auth logout
 ```
 
-## Output Formats
+---
 
-Most commands support `--format` option:
-
-- `table` - Human-readable table format (default)
-- `json` - JSON output for scripting
+## Example: Posting to Encode Club
 
 ```bash
-linkedin profile --format json
-linkedin posts list --format json
+# List orgs to find the ID
+node dist/index.js orgs list --format json
+# Output shows: "id": 34623057 for Encode Club
+
+# Post with image
+node dist/index.js orgs post 34623057 \
+  -t "🚀 Big announcement coming soon!" \
+  -i ./announcement.png
 ```
 
-## Credential Storage
+---
 
-Credentials are stored securely at:
-- `~/.clawdbot/credentials/linkedin.json`
+## Troubleshooting
 
-Or if using moltbot:
-- `~/.moltbot/credentials/linkedin.json`
+### "Not enough permissions"
 
-## Token Lifecycle
+Your token doesn't have the right scopes. Fix:
 
-- Access tokens expire after ~60 days
-- The CLI warns when tokens are expiring within 7 days
-- Use `linkedin auth refresh` to extend token validity
-- Tokens with refresh_token can be refreshed automatically
+1. Make sure your LinkedIn app has the products enabled (step 4)
+2. Check your `.env` has the right `LINKEDIN_SCOPES`
+3. Logout and login again:
+   ```bash
+   node dist/index.js auth logout
+   node dist/index.js auth login
+   ```
 
-## API Scopes
+### "Scope X is not authorized"
 
-Default scopes requested:
-- `openid` - OpenID Connect authentication
-- `profile` - Basic profile information
-- `email` - Email address
-- `w_member_social` - Create posts on behalf of user
+That scope isn't enabled for your LinkedIn app. Go to your app's **Products** tab and request the relevant product.
 
-For organization posting, your app also needs:
-- `rw_organization_admin` - Administer organization pages
+### "File not found"
 
-## Development
-
+Check the image path. Use absolute paths to be safe:
 ```bash
-# Run in development mode
-npm run dev -- auth status
-
-# Run tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-
-# Build
-npm run build
+-i /Users/yourname/Desktop/photo.jpg
 ```
 
-## Testing
+### Token expired
 
-The CLI includes comprehensive tests:
-
+Tokens last ~60 days. Just login again:
 ```bash
-# Run all tests
-npm test
-
-# Run with coverage report
-npm run test:coverage
-
-# Watch mode for development
-npm run test:watch
+node dist/index.js auth login
 ```
 
-Test files:
-- `tests/oauth.test.ts` - OAuth flow and token management
-- `tests/client.test.ts` - API client methods
-- `tests/output.test.ts` - Output formatting
+---
 
-## API Reference
+## All Commands
 
-This CLI uses the LinkedIn API v2. Key endpoints:
+| Command | Description |
+|---------|-------------|
+| `auth setup` | Show setup instructions |
+| `auth login` | Login to LinkedIn |
+| `auth logout` | Logout and delete credentials |
+| `auth status` | Check if you're logged in |
+| `auth refresh` | Refresh your token |
+| `profile` | View your profile |
+| `posts list` | List your recent posts |
+| `posts create -t "text"` | Create a personal post |
+| `posts create -t "text" -i image.jpg` | Personal post with image |
+| `posts delete <id>` | Delete a post |
+| `orgs list` | List company pages you admin |
+| `orgs post <id> -t "text"` | Post to company page |
+| `orgs post <id> -t "text" -i image.jpg` | Company post with image |
 
-- **OAuth Authorization**: `https://www.linkedin.com/oauth/v2/authorization`
-- **Token Exchange**: `https://www.linkedin.com/oauth/v2/accessToken`
-- **User Info**: `https://api.linkedin.com/v2/userinfo`
-- **Posts (UGC)**: `https://api.linkedin.com/v2/ugcPosts`
-- **Assets**: `https://api.linkedin.com/v2/assets`
+---
 
-## Limitations
+## Where Are My Credentials Stored?
 
-- Images must be publicly accessible URLs (LinkedIn fetches them)
-- Video posting requires additional API permissions
-- Rate limits apply (see LinkedIn API documentation)
-- Some features require app review for production use
+```
+~/.clawdbot/credentials/linkedin.json
+```
+
+This file contains your access token. Don't share it.
+
+---
+
+## Need Help?
+
+Run any command with `--help`:
+```bash
+node dist/index.js --help
+node dist/index.js orgs --help
+node dist/index.js orgs post --help
+```
+
+---
 
 ## License
 

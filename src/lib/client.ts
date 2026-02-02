@@ -2,6 +2,8 @@
  * LinkedIn API Client
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { 
   OAuthTokens, 
   LinkedInProfile, 
@@ -12,6 +14,39 @@ import {
   APIError
 } from './types.js';
 import { loadTokens, isTokenExpired } from './oauth.js';
+
+/**
+ * Check if a string is a local file path
+ */
+function isLocalPath(str: string): boolean {
+  return str.startsWith('/') || str.startsWith('./') || str.startsWith('../') || str.startsWith('~');
+}
+
+/**
+ * Read image from local file or URL
+ */
+async function getImageBuffer(source: string): Promise<ArrayBuffer> {
+  if (isLocalPath(source)) {
+    // Expand ~ to home directory
+    const filePath = source.startsWith('~') 
+      ? path.join(process.env.HOME || '', source.slice(1))
+      : source;
+    
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+    
+    const buffer = fs.readFileSync(filePath);
+    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  } else {
+    // Fetch from URL
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    }
+    return response.arrayBuffer();
+  }
+}
 
 const API_BASE = 'https://api.linkedin.com/v2';
 const USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
@@ -142,7 +177,7 @@ export class LinkedInClient {
   }
   
   /**
-   * Create a post with an image
+   * Create a post with an image (supports local file paths or URLs)
    */
   async createImagePost(options: CreatePostOptions & { imageUrl: string }): Promise<{ id: string }> {
     const authorUrn = await this.getMemberUrn();
@@ -152,12 +187,8 @@ export class LinkedInClient {
     const uploadUrl = registerResponse.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
     const asset = registerResponse.value.asset;
     
-    // Step 2: Download the image
-    const imageResponse = await fetch(options.imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
-    }
-    const imageBuffer = await imageResponse.arrayBuffer();
+    // Step 2: Get the image (from local file or URL)
+    const imageBuffer = await getImageBuffer(options.imageUrl);
     
     // Step 3: Upload the image to LinkedIn
     const uploadResponse = await fetch(uploadUrl, {
@@ -276,6 +307,64 @@ export class LinkedInClient {
             text: options.text
           },
           shareMediaCategory: 'NONE'
+        }
+      }
+    };
+    
+    return this.request<{ id: string }>('/ugcPosts', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  /**
+   * Create an image post on behalf of an organization (supports local file paths or URLs)
+   */
+  async createOrganizationImagePost(
+    organizationId: string,
+    options: CreatePostOptions & { imageUrl: string }
+  ): Promise<{ id: string }> {
+    const orgUrn = `urn:li:organization:${organizationId}`;
+    
+    // Step 1: Register the image upload with org as owner
+    const registerResponse = await this.registerImageUpload(orgUrn);
+    const uploadUrl = registerResponse.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+    const asset = registerResponse.value.asset;
+    
+    // Step 2: Get the image (from local file or URL)
+    const imageBuffer = await getImageBuffer(options.imageUrl);
+    
+    // Step 3: Upload the image to LinkedIn
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${this.tokens.access_token}`,
+        'Content-Type': 'application/octet-stream'
+      },
+      body: imageBuffer
+    });
+    
+    if (!uploadResponse.ok) {
+      throw new Error(`Failed to upload image: ${uploadResponse.statusText}`);
+    }
+    
+    // Step 4: Create the post with the uploaded image
+    const payload = {
+      author: orgUrn,
+      lifecycleState: 'PUBLISHED',
+      visibility: {
+        'com.linkedin.ugc.MemberNetworkVisibility': options.visibility || 'PUBLIC'
+      },
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: {
+            text: options.text
+          },
+          shareMediaCategory: 'IMAGE',
+          media: [{
+            status: 'READY',
+            media: asset
+          }]
         }
       }
     };

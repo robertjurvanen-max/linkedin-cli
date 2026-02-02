@@ -17,7 +17,10 @@ export const DEFAULT_SCOPES = [
   'openid',
   'profile', 
   'email',
-  'w_member_social'
+  'w_member_social',
+  'r_organization_social',
+  'w_organization_social',
+  'rw_organization_admin'
 ];
 
 /**
